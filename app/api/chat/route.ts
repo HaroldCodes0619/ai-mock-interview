@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
     if (action === 'start') {
       const jobTitle = formData.get('jobTitle') as string;
       const file = formData.get('file') as File;
+      const persona = formData.get('persona') as string || 'Standard Interviewer';
       
       let parsedText = '';
       if (file) {
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
       }
 
       const prompt = `You are an expert interviewer and defense committee member. 
+      Your persona is: ${persona}. You MUST strictly embody this persona in your tone and style.
       The candidate is applying for/defending: "${jobTitle}".
       Here is their background/context document:
       ---
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
       Your objective is to ask them a rigorous, highly relevant interview question based on their document.
       RULES:
       1. ONLY ask ONE question. Do not provide a preamble. Do not answer it for them.
-      2. Act completely in character.
+      2. Act completely in character as the "${persona}".
       3. The question should be challenging and specific to their provided context.`;
 
       const chatCompletion = await groq.chat.completions.create({
@@ -52,6 +54,7 @@ export async function POST(req: NextRequest) {
 
     if (action === 'chat') {
       const historyStr = formData.get('history') as string;
+      const persona = formData.get('persona') as string || 'Standard Interviewer';
       const history = JSON.parse(historyStr);
       
       // Convert history to Groq format (role and content)
@@ -63,7 +66,7 @@ export async function POST(req: NextRequest) {
       // Add strict instruction to the final system prompt or user message
       messages.push({
         role: 'user',
-        content: "Based on my previous answer, ask me the NEXT logical interview question. Strict rule: Ask ONLY ONE question. Do not break character. Do not provide any preamble."
+        content: `Based on my previous answer, ask me the NEXT logical interview question. Strict rule: Ask ONLY ONE question. Do not break character. You are embodying the persona of a ${persona}. Do not provide any preamble.`
       });
 
       const chatCompletion = await groq.chat.completions.create({
