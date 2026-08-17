@@ -35,7 +35,7 @@ export default function MockInterviewApp() {
   const [password, setPassword] = useState('');
   
   // Hardcoded Credentials
-  const APP_EMAIL = 'salvana775@gmail.com';
+  const APP_EMAIL = 'salvanaj75@gmail.com';
   const APP_PASSWORD = 'Salvana';
 
   // Setup State
