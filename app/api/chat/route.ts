@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
       You must provide a comprehensive evaluation using the following JSON structure exactly. DO NOT wrap it in markdown block quotes. Return ONLY the raw JSON object.
       {
         "grade": "A",
+        "recommendation": "Overall actionable advice and next steps for the candidate to improve.",
         "metrics": {
           "clarity": 85,
           "relevance": 90,

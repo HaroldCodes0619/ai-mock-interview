@@ -11,3 +11,27 @@ body {
   color: var(--foreground);
   background: var(--background);
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  /* Invert backgrounds to white and text to black for ink saving */
+  .bg-zinc-900, .bg-zinc-950, .bg-zinc-950\/50, .bg-zinc-950\/80 {
+    background-color: white !important;
+    color: black !important;
+    border-color: #e4e4e7 !important; /* light gray */
+  }
+  .text-zinc-100, .text-zinc-200, .text-zinc-300, .text-zinc-400 {
+    color: black !important;
+  }
+  /* Force background colors on print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+}

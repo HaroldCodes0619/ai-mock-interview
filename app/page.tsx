@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Send, FileText, CheckCircle, Award, BrainCircuit, Loader2, ArrowRight, Mic, MicOff, Volume2, VolumeX, Download, Copy, SkipForward, Clock } from 'lucide-react';
+import { Upload, Send, FileText, CheckCircle, Award, BrainCircuit, Loader2, ArrowRight, Mic, MicOff, Volume2, VolumeX, Download, Lock, SkipForward, Clock, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type ViewState = 'setup' | 'interview' | 'evaluation';
+type ViewState = 'auth' | 'setup' | 'interview' | 'evaluating' | 'evaluation';
 
 interface Message {
   role: 'user' | 'ai';
@@ -13,6 +13,7 @@ interface Message {
 
 interface EvaluationData {
   grade: string;
+  recommendation: string;
   metrics: {
     clarity: number;
     relevance: number;
@@ -27,8 +28,16 @@ interface EvaluationData {
 }
 
 export default function MockInterviewApp() {
-  const [view, setView] = useState<ViewState>('setup');
+  const [view, setView] = useState<ViewState>('auth');
   
+  // Auth State
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  
+  // Hardcoded Credentials
+  const APP_EMAIL = 'salvana775@gmail.com';
+  const APP_PASSWORD = 'Salvana';
+
   // Setup State
   const [jobTitle, setJobTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -137,6 +146,16 @@ export default function MockInterviewApp() {
     }
   }, [messages, view, currentInput]);
 
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email.trim().toLowerCase() === APP_EMAIL && password === APP_PASSWORD) {
+      setView('setup');
+    } else {
+      alert('Incorrect email or password');
+      setPassword('');
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -179,9 +198,14 @@ export default function MockInterviewApp() {
     const newMessages: Message[] = [...messages, { role: 'user', content: inputToSend }];
     setMessages(newMessages);
     setCurrentInput('');
-    setIsLoading(true);
     
     const isFinishing = turnCount >= maxTurns - 1;
+    
+    if (isFinishing) {
+      setView('evaluating');
+    } else {
+      setIsLoading(true);
+    }
 
     const formData = new FormData();
     formData.append('action', isFinishing ? 'evaluate' : 'chat');
@@ -205,6 +229,7 @@ export default function MockInterviewApp() {
     } catch (err) {
       console.error(err);
       alert('Failed to send answer.');
+      if (isFinishing) setView('interview');
     } finally {
       setIsLoading(false);
     }
@@ -216,6 +241,7 @@ export default function MockInterviewApp() {
     report += `Role: ${jobTitle}\n`;
     report += `Overall Grade: ${evaluation.grade}\n`;
     report += `Metrics: Clarity (${evaluation.metrics.clarity}), Relevance (${evaluation.metrics.relevance}), Completeness (${evaluation.metrics.completeness})\n\n`;
+    report += `Recommendation: ${evaluation.recommendation}\n\n`;
     report += `-------------------------------------------------\n\n`;
     
     evaluation.feedback.forEach((f, idx) => {
@@ -243,6 +269,47 @@ export default function MockInterviewApp() {
 
   return (
     <AnimatePresence mode="wait">
+      {view === 'auth' && (
+        <motion.div 
+          key="auth"
+          initial="initial" animate="in" exit="out" variants={pageVariants}
+          className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4 relative"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-900/20 via-zinc-950 to-zinc-950 pointer-events-none"></div>
+          <div className="max-w-md w-full bg-zinc-900/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border border-zinc-800/50 z-10 text-center">
+            <div className="inline-flex p-4 rounded-2xl bg-emerald-500/10 mb-6">
+              <Lock className="w-10 h-10 text-emerald-400" />
+            </div>
+            <h1 className="text-3xl font-extrabold text-zinc-100 mb-2 tracking-tight">Access Required</h1>
+            <p className="text-zinc-400 mb-8">Please log in to access the AI Defense Coach.</p>
+            
+            <form onSubmit={handleLogin} className="space-y-4">
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email address..." 
+                className="w-full px-5 py-4 bg-zinc-950 rounded-xl border border-zinc-800 text-zinc-100 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all outline-none text-center tracking-widest"
+              />
+              <input 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password..." 
+                className="w-full px-5 py-4 bg-zinc-950 rounded-xl border border-zinc-800 text-zinc-100 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all outline-none text-center tracking-widest"
+              />
+              <button 
+                type="submit"
+                disabled={!email || !password}
+                className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-emerald-500 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+              >
+                Unlock Application
+              </button>
+            </form>
+          </div>
+        </motion.div>
+      )}
+
       {view === 'setup' && (
         <motion.div 
           key="setup"
@@ -430,6 +497,24 @@ export default function MockInterviewApp() {
         </motion.div>
       )}
 
+      {view === 'evaluating' && (
+        <motion.div 
+          key="evaluating"
+          initial="initial" animate="in" exit="out" variants={pageVariants}
+          className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4 relative"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-900/20 via-zinc-950 to-zinc-950 pointer-events-none"></div>
+          <div className="z-10 flex flex-col items-center text-center max-w-lg">
+            <div className="inline-flex p-5 rounded-3xl bg-zinc-900/80 border border-zinc-800 mb-8 shadow-2xl">
+              <Award className="w-16 h-16 text-emerald-400 animate-bounce" />
+            </div>
+            <h2 className="text-3xl font-extrabold text-zinc-100 mb-3 tracking-tight">Evaluating Transcript...</h2>
+            <p className="text-lg text-zinc-400">The AI is thoroughly analyzing your entire interview performance and generating personalized feedback.</p>
+            <Loader2 className="animate-spin w-8 h-8 text-emerald-500 mt-8" />
+          </div>
+        </motion.div>
+      )}
+
       {view === 'evaluation' && evaluation && (
         <motion.div 
           key="evaluation"
@@ -447,8 +532,11 @@ export default function MockInterviewApp() {
                   <p className="text-zinc-400 mt-1">{jobTitle}</p>
                 </div>
               </div>
-              <div className="flex gap-4">
-                <button onClick={downloadReport} className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 px-6 py-3 rounded-xl font-semibold text-zinc-300 transition-all">
+              <div className="flex flex-wrap gap-4 no-print">
+                <button onClick={() => window.print()} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 px-6 py-3 rounded-xl font-semibold text-zinc-200 transition-all shadow-md">
+                  <Printer className="w-4 h-4" /> Print PDF
+                </button>
+                <button onClick={downloadReport} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-xl font-semibold text-emerald-50 transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)]">
                   <Download className="w-4 h-4" /> Download Report
                 </button>
               </div>
@@ -456,9 +544,9 @@ export default function MockInterviewApp() {
 
             <div className="grid md:grid-cols-3 gap-8">
               <div className="md:col-span-1 bg-zinc-900 rounded-3xl p-8 border border-zinc-800 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
-                <div className="absolute top-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
+                <div className="absolute top-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 no-print"></div>
                 <h3 className="text-zinc-400 font-bold uppercase tracking-widest text-sm mb-4">Overall Grade</h3>
-                <div className="text-9xl font-black text-transparent bg-clip-text bg-gradient-to-br from-zinc-100 to-zinc-500 drop-shadow-sm">{evaluation.grade}</div>
+                <div className="text-9xl font-black text-emerald-500 drop-shadow-sm">{evaluation.grade}</div>
               </div>
 
               <div className="md:col-span-2 bg-zinc-900 rounded-3xl p-8 border border-zinc-800 space-y-8 shadow-xl">
@@ -474,11 +562,18 @@ export default function MockInterviewApp() {
                       <span className="font-bold text-emerald-400">{metric.value}<span className="text-zinc-600">/100</span></span>
                     </div>
                     <div className="w-full bg-zinc-950 rounded-full h-3 overflow-hidden border border-zinc-800">
-                      <div className="bg-gradient-to-r from-emerald-600 to-emerald-400 h-3 rounded-full transition-all duration-1000 ease-out" style={{ width: `${metric.value}%` }}></div>
+                      <div className="bg-emerald-500 h-3 rounded-full transition-all duration-1000 ease-out" style={{ width: `${metric.value}%` }}></div>
                     </div>
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="bg-emerald-950/20 rounded-3xl p-8 border border-emerald-900/30 shadow-xl">
+              <h3 className="text-xl font-bold text-zinc-100 border-b border-emerald-900/30 pb-5 mb-6 flex items-center gap-3">
+                <BrainCircuit className="w-6 h-6 text-emerald-400" /> AI Recommendation
+              </h3>
+              <p className="text-emerald-50/90 leading-relaxed text-lg">{evaluation.recommendation}</p>
             </div>
 
             <div className="bg-zinc-900 rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl">
@@ -520,7 +615,7 @@ export default function MockInterviewApp() {
               </div>
             </div>
             
-            <div className="text-center pt-8 pb-16">
+            <div className="text-center pt-8 pb-16 no-print">
                <button onClick={() => window.location.reload()} className="bg-emerald-600 text-emerald-50 px-10 py-5 rounded-2xl font-bold hover:bg-emerald-500 transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)]">
                  Start New Interview
                </button>
