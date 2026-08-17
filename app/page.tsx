@@ -199,12 +199,16 @@ export default function MockInterviewApp() {
       formData.append('jobTitle', jobTitle);
       try {
         const res = await fetch('/api/chat', { method: 'POST', body: formData });
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
         const data = await res.json();
+        if (!data || !data.evaluation || !data.evaluation.grade) {
+          throw new Error('Invalid evaluation data returned from AI');
+        }
         setEvaluation(data.evaluation);
         setView('evaluation');
       } catch (err) {
         console.error(err);
-        alert('Failed to evaluate.');
+        alert('Failed to evaluate. This usually happens if the AI takes too long to respond (Vercel timeout). Please try again.');
         setView('interview');
       } finally {
         setIsLoading(false);
@@ -554,15 +558,15 @@ export default function MockInterviewApp() {
               <div className="md:col-span-1 bg-zinc-900 rounded-3xl p-8 border border-zinc-800 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
                 <div className="absolute top-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 no-print"></div>
                 <h3 className="text-zinc-400 font-bold uppercase tracking-widest text-sm mb-4">Overall Grade</h3>
-                <div className="text-9xl font-black text-emerald-500 drop-shadow-sm">{evaluation.grade}</div>
+                <div className="text-9xl font-black text-emerald-500 drop-shadow-sm">{evaluation.grade || 'N/A'}</div>
               </div>
 
               <div className="md:col-span-2 bg-zinc-900 rounded-3xl p-8 border border-zinc-800 space-y-8 shadow-xl">
                 <h3 className="text-xl font-bold text-zinc-100 border-b border-zinc-800 pb-5">Performance Metrics</h3>
                 {[
-                  { label: 'Clarity', value: evaluation.metrics.clarity },
-                  { label: 'Relevance', value: evaluation.metrics.relevance },
-                  { label: 'Completeness', value: evaluation.metrics.completeness }
+                  { label: 'Clarity', value: evaluation.metrics?.clarity || 0 },
+                  { label: 'Relevance', value: evaluation.metrics?.relevance || 0 },
+                  { label: 'Completeness', value: evaluation.metrics?.completeness || 0 }
                 ].map((metric) => (
                   <div key={metric.label}>
                     <div className="flex justify-between mb-3">
@@ -591,7 +595,7 @@ export default function MockInterviewApp() {
                 </h3>
               </div>
               <div className="divide-y divide-zinc-800/50">
-                {evaluation.feedback.map((item, idx) => (
+                {(evaluation.feedback || []).map((item, idx) => (
                   <div key={idx} className="p-8 space-y-6 hover:bg-zinc-800/20 transition-colors">
                     <div className="flex flex-col md:flex-row gap-6">
                       <div className="bg-zinc-950 border border-zinc-800 text-emerald-500 font-black text-xl w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
+export const maxDuration = 60; // Increase Vercel timeout limit
 import pdfParse from 'pdf-parse';
 
 // Initialize the Groq Client
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
         messages: [
           { role: 'user', content: prompt }
         ],
-        model: 'llama-3.1-70b-versatile', // Using larger model for advanced evaluation and json adherence
+        model: 'llama-3.1-8b-instant', // Use 8B for faster evaluation to prevent Vercel timeouts
         response_format: { type: "json_object" }, // Enable Groq JSON mode
       });
 
