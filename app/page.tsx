@@ -42,7 +42,7 @@ export default function MockInterviewApp() {
   const [jobTitle, setJobTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [persona, setPersona] = useState('Standard Interviewer');
-  const [maxTurns, setMaxTurns] = useState(4);
+  const [isInterviewComplete, setIsInterviewComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -125,7 +125,7 @@ export default function MockInterviewApp() {
   // Timer Logic
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (view === 'interview' && !isLoading && turnCount < maxTurns) {
+    if (view === 'interview' && !isLoading && !isInterviewComplete) {
       timer = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
@@ -137,7 +137,7 @@ export default function MockInterviewApp() {
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [view, isLoading, turnCount, maxTurns]);
+  }, [view, isLoading, isInterviewComplete]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -180,6 +180,7 @@ export default function MockInterviewApp() {
       speakText(data.reply);
       setView('interview');
       setTimeLeft(QUESTION_TIME);
+      setIsInterviewComplete(data.isComplete);
     } catch (err) {
       console.error(err);
       alert('Failed to start interview.');
@@ -189,6 +190,28 @@ export default function MockInterviewApp() {
   };
 
   const sendAnswer = async (overrideInput?: string) => {
+    if (isInterviewComplete) {
+      setIsLoading(true);
+      setView('evaluating');
+      const formData = new FormData();
+      formData.append('action', 'evaluate');
+      formData.append('history', JSON.stringify(messages));
+      formData.append('jobTitle', jobTitle);
+      try {
+        const res = await fetch('/api/chat', { method: 'POST', body: formData });
+        const data = await res.json();
+        setEvaluation(data.evaluation);
+        setView('evaluation');
+      } catch (err) {
+        console.error(err);
+        alert('Failed to evaluate.');
+        setView('interview');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     const inputToSend = overrideInput || currentInput;
     if (!inputToSend.trim()) return;
     
@@ -198,38 +221,25 @@ export default function MockInterviewApp() {
     const newMessages: Message[] = [...messages, { role: 'user', content: inputToSend }];
     setMessages(newMessages);
     setCurrentInput('');
-    
-    const isFinishing = turnCount >= maxTurns - 1;
-    
-    if (isFinishing) {
-      setView('evaluating');
-    } else {
-      setIsLoading(true);
-    }
+    setIsLoading(true);
 
     const formData = new FormData();
-    formData.append('action', isFinishing ? 'evaluate' : 'chat');
+    formData.append('action', 'chat');
     formData.append('history', JSON.stringify(newMessages));
     formData.append('persona', persona);
-    if (isFinishing) formData.append('jobTitle', jobTitle);
 
     try {
       const res = await fetch('/api/chat', { method: 'POST', body: formData });
       const data = await res.json();
       
-      if (isFinishing) {
-        setEvaluation(data.evaluation);
-        setView('evaluation');
-      } else {
-        setMessages([...newMessages, { role: 'ai', content: data.reply }]);
-        speakText(data.reply);
-        setTurnCount((prev) => prev + 1);
-        setTimeLeft(QUESTION_TIME);
-      }
+      setMessages([...newMessages, { role: 'ai', content: data.reply }]);
+      speakText(data.reply);
+      setTurnCount((prev) => prev + 1);
+      setTimeLeft(QUESTION_TIME);
+      setIsInterviewComplete(data.isComplete);
     } catch (err) {
       console.error(err);
       alert('Failed to send answer.');
-      if (isFinishing) setView('interview');
     } finally {
       setIsLoading(false);
     }
@@ -363,12 +373,10 @@ export default function MockInterviewApp() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-zinc-300 mb-2">Interview Length: {maxTurns} Qs</label>
-                    <input 
-                      type="range" min="3" max="10" 
-                      value={maxTurns} onChange={(e) => setMaxTurns(parseInt(e.target.value))}
-                      className="w-full h-2 mt-4 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                    />
+                    <label className="block text-sm font-semibold text-zinc-300 mb-2">Interview Length</label>
+                    <div className="w-full px-4 py-3 bg-zinc-950 rounded-xl border border-zinc-800 text-zinc-500 text-sm">
+                      Dynamic (AI decides based on context)
+                    </div>
                   </div>
                 </div>
 
@@ -426,7 +434,7 @@ export default function MockInterviewApp() {
               </button>
               
               <div className="bg-zinc-800 px-4 py-2 rounded-full text-sm font-semibold text-zinc-300 border border-zinc-700">
-                Q <span className="text-emerald-400">{turnCount + 1}</span> / {maxTurns}
+                Q <span className="text-emerald-400">{turnCount + 1}</span>
               </div>
             </div>
           </header>
@@ -475,19 +483,19 @@ export default function MockInterviewApp() {
                 />
                 <button 
                   onClick={() => sendAnswer()}
-                  disabled={isLoading || !currentInput.trim()}
-                  className={`px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all disabled:opacity-50 text-white ${turnCount >= maxTurns - 1 ? 'bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.2)]' : 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]'}`}
+                  disabled={isLoading || (!isInterviewComplete && !currentInput.trim())}
+                  className={`px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all disabled:opacity-50 text-white ${isInterviewComplete ? 'bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.2)]' : 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]'}`}
                 >
-                  {isLoading ? <Loader2 className="animate-spin w-5 h-5" /> : (turnCount >= maxTurns - 1 ? 'Finish' : 'Submit')}
-                  {!isLoading && (turnCount >= maxTurns - 1 ? <CheckCircle className="w-5 h-5" /> : <Send className="w-5 h-5" />)}
+                  {isLoading ? <Loader2 className="animate-spin w-5 h-5" /> : (isInterviewComplete ? 'Evaluate' : 'Submit')}
+                  {!isLoading && (isInterviewComplete ? <CheckCircle className="w-5 h-5" /> : <Send className="w-5 h-5" />)}
                 </button>
               </div>
               <div className="flex justify-between items-center text-xs text-zinc-500">
                 <p>Press <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-300 mx-1">Enter</kbd> to submit</p>
                 <button 
                   onClick={() => sendAnswer("I don't know the answer to this question, please move on to the next one.")}
-                  disabled={isLoading}
-                  className="flex items-center gap-1 hover:text-zinc-300 transition-colors"
+                  disabled={isLoading || isInterviewComplete}
+                  className="flex items-center gap-1 hover:text-zinc-300 transition-colors disabled:opacity-50 disabled:hover:text-zinc-500"
                 >
                   <SkipForward className="w-3 h-3" /> Skip Question
                 </button>

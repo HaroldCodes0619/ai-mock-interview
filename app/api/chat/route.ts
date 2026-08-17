@@ -40,16 +40,25 @@ export async function POST(req: NextRequest) {
       RULES:
       1. ONLY ask ONE question. Do not provide a preamble. Do not answer it for them.
       2. Act completely in character as the "${persona}".
-      3. The question should be challenging and specific to their provided context.`;
+      3. The question should be challenging and specific to their provided context.
+      
+      You must return your response as a JSON object strictly matching this format:
+      {
+        "isComplete": false,
+        "message": "Your question here."
+      }`;
 
       const chatCompletion = await groq.chat.completions.create({
         messages: [
           { role: 'user', content: prompt }
         ],
         model: 'llama-3.1-8b-instant', // Fast model for standard questions
+        response_format: { type: "json_object" },
       });
 
-      return NextResponse.json({ reply: chatCompletion.choices[0]?.message?.content });
+      const responseText = chatCompletion.choices[0]?.message?.content || '{}';
+      const parsedData = JSON.parse(responseText);
+      return NextResponse.json({ reply: parsedData.message, isComplete: parsedData.isComplete });
     }
 
     if (action === 'chat') {
@@ -66,15 +75,27 @@ export async function POST(req: NextRequest) {
       // Add strict instruction to the final system prompt or user message
       messages.push({
         role: 'user',
-        content: `Based on my previous answer, ask me the NEXT logical interview question. Strict rule: Ask ONLY ONE question. Do not break character. You are embodying the persona of a ${persona}. Do not provide any preamble.`
+        content: `Based on my previous answer, ask me the NEXT logical interview question, OR conclude the interview if you feel we have covered enough depth based on the complexity of the topic.
+        Strict rules: 
+        - If asking a question, ask ONLY ONE question. Do not break character. 
+        - If concluding, provide a brief concluding remark.
+        
+        You must return your response as a JSON object strictly matching this format:
+        {
+          "isComplete": boolean,
+          "message": "Your question or concluding remark here."
+        }`
       });
 
       const chatCompletion = await groq.chat.completions.create({
         messages,
         model: 'llama-3.1-8b-instant',
+        response_format: { type: "json_object" },
       });
 
-      return NextResponse.json({ reply: chatCompletion.choices[0]?.message?.content });
+      const responseText = chatCompletion.choices[0]?.message?.content || '{}';
+      const parsedData = JSON.parse(responseText);
+      return NextResponse.json({ reply: parsedData.message, isComplete: parsedData.isComplete });
     }
 
     if (action === 'evaluate') {
