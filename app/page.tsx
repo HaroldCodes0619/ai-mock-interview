@@ -291,8 +291,8 @@ export default function MockInterviewApp() {
         >
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-900/20 via-zinc-950 to-zinc-950 pointer-events-none"></div>
           <div className="max-w-md w-full bg-zinc-900/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border border-zinc-800/50 z-10 text-center">
-            <div className="inline-flex p-4 rounded-2xl bg-emerald-500/10 mb-6">
-              <Lock className="w-10 h-10 text-emerald-400" />
+            <div className="flex justify-center mb-6">
+              <img src="/logo_transparent.png" alt="AI Defense Coach Logo" className="w-32 h-32 object-contain drop-shadow-2xl" />
             </div>
             <h1 className="text-3xl font-extrabold text-zinc-100 mb-2 tracking-tight">Access Required</h1>
             <p className="text-zinc-400 mb-8">Please log in to access the AI Defense Coach.</p>
