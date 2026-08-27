@@ -174,6 +174,7 @@ export default function MockInterviewApp() {
 
     try {
       const res = await fetch('/api/chat', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
       
       setMessages([{ role: 'ai', content: data.reply }]);
@@ -234,6 +235,7 @@ export default function MockInterviewApp() {
 
     try {
       const res = await fetch('/api/chat', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
       
       setMessages([...newMessages, { role: 'ai', content: data.reply }]);

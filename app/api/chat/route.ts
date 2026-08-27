@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
           { role: 'system', content: 'You are an expert interviewer and defense committee member. You must strictly output valid JSON.' },
           { role: 'user', content: prompt }
         ],
-        model: 'llama-3.1-70b-versatile', // Use 70B for higher reliability with JSON
+        model: 'llama-3.3-70b-versatile', // Use 70B for higher reliability with JSON
         response_format: { type: "json_object" },
         max_tokens: 300,
         temperature: 0.7,
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
           { role: 'system', content: 'You are an expert interviewer. You must strictly output valid JSON. Never include markdown.' },
           ...messages
         ],
-        model: 'llama-3.1-70b-versatile',
+        model: 'llama-3.3-70b-versatile',
         response_format: { type: "json_object" },
         max_tokens: 300,
         temperature: 0.7,
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
           { role: 'system', content: 'You are an expert evaluator. You must strictly output valid JSON matching the requested structure. Never include markdown block quotes or explanations.' },
           { role: 'user', content: prompt }
         ],
-        model: 'llama-3.3-70b-versatile', // Use a smarter model for complex JSON evaluation
+        model: 'llama-3.3-70b-versatile', // Use 8B for faster evaluation to prevent Vercel timeouts
         response_format: { type: "json_object" }, // Enable Groq JSON mode
         max_tokens: 2500,
         temperature: 0.3,
