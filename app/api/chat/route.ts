@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       The candidate is applying for/defending: "${jobTitle}".
       Here is their background/context document:
       ---
-      ${parsedText.substring(0, 30000)}
+      ${parsedText.substring(0, 60000)}
       ---
       Your objective is to ask them a rigorous, highly relevant interview question based on their document.
       RULES:
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
             jobTitle,
             persona,
             fileName: fileName || undefined,
-            documentText: parsedText.substring(0, 15000),
+            documentText: parsedText.substring(0, 60000),
             messages: {
               create: [
                 { role: 'ai', content: reply }
