@@ -4,6 +4,7 @@ import pdfParse from 'pdf-parse';
 import prisma from '@/lib/prisma';
 
 export const maxDuration = 60; // Increase Vercel timeout limit
+export const dynamic = 'force-dynamic';
 
 // Initialize the Groq Client
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
