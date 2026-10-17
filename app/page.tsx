@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Send, FileText, CheckCircle, Award, BrainCircuit, Loader2, ArrowRight, Mic, MicOff, Volume2, VolumeX, Download, Lock, SkipForward, Clock, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { extractTextFromFile } from '@/lib/extractText';
 
 type ViewState = 'auth' | 'setup' | 'interview' | 'evaluating' | 'evaluation';
 
@@ -44,6 +45,7 @@ export default function MockInterviewApp() {
   const [persona, setPersona] = useState('Standard Interviewer');
   const [isInterviewComplete, setIsInterviewComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Interview State
@@ -165,28 +167,38 @@ export default function MockInterviewApp() {
   const startInterview = async () => {
     if (!jobTitle || !file) return alert('Please provide a topic/title and upload a file.');
     setIsLoading(true);
+    setLoadingStatus('Extracting document text in browser...');
     
-    const formData = new FormData();
-    formData.append('action', 'start');
-    formData.append('jobTitle', jobTitle);
-    formData.append('persona', persona);
-    formData.append('file', file);
-
     try {
+      // Client-side PDF / TXT extraction handles mild to large files (bypassing Vercel 4.5MB serverless limits)
+      const extractedText = await extractTextFromFile(file);
+
+      setLoadingStatus('Analyzing context & crafting first question...');
+
+      const formData = new FormData();
+      formData.append('action', 'start');
+      formData.append('jobTitle', jobTitle);
+      formData.append('persona', persona);
+      formData.append('documentText', extractedText);
+      formData.append('fileName', file.name);
+
       const res = await fetch('/api/chat', { method: 'POST', body: formData });
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `API error: ${res.status}`);
+      }
       
       setMessages([{ role: 'ai', content: data.reply }]);
       speakText(data.reply);
       setView('interview');
       setTimeLeft(QUESTION_TIME);
       setIsInterviewComplete(data.isComplete);
-    } catch (err) {
-      console.error(err);
-      alert('Failed to start interview.');
+    } catch (err: any) {
+      console.error("Start interview error:", err);
+      alert(err.message || 'Failed to start interview.');
     } finally {
       setIsLoading(false);
+      setLoadingStatus('');
     }
   };
 
@@ -339,7 +351,9 @@ export default function MockInterviewApp() {
               <div className="inline-flex p-5 rounded-3xl bg-zinc-900/80 border border-zinc-800 mb-8 shadow-2xl">
                 <BrainCircuit className="w-16 h-16 text-emerald-400 animate-pulse" />
               </div>
-              <h2 className="text-3xl font-extrabold text-zinc-100 mb-3 tracking-tight">Analyzing Context...</h2>
+              <h2 className="text-3xl font-extrabold text-zinc-100 mb-3 tracking-tight">
+                {loadingStatus || 'Analyzing Context...'}
+              </h2>
               <p className="text-lg text-zinc-400 text-center max-w-md">Extracting key information from your document and crafting your first personalized question.</p>
               <Loader2 className="animate-spin w-8 h-8 text-emerald-500 mt-8" />
             </div>
@@ -394,7 +408,9 @@ export default function MockInterviewApp() {
                   >
                     <Upload className="w-10 h-10 text-zinc-600 group-hover:text-emerald-400 transition-colors mb-3" />
                     <p className="text-zinc-300 font-medium text-md">Click to upload or drag and drop</p>
-                    <p className="text-zinc-500 text-sm mt-1">{file ? file.name : "Resume, Job Description, or Thesis Abstract"}</p>
+                    <p className="text-zinc-500 text-sm mt-1">
+                      {file ? `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)` : "Resume, Job Description, or Thesis (PDF or TXT)"}
+                    </p>
                     <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.txt" className="hidden" />
                   </div>
                 </div>

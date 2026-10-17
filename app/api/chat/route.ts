@@ -14,11 +14,14 @@ export async function POST(req: NextRequest) {
 
     if (action === 'start') {
       const jobTitle = formData.get('jobTitle') as string;
-      const file = formData.get('file') as File;
+      const documentText = formData.get('documentText') as string;
+      const file = formData.get('file') as File | null;
       const persona = formData.get('persona') as string || 'Standard Interviewer';
       
-      let parsedText = '';
-      if (file) {
+      let parsedText = documentText || '';
+      
+      // Fallback: If client did not send documentText directly, parse file on server
+      if (!parsedText && file) {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         
@@ -30,12 +33,18 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      if (!parsedText || !parsedText.trim()) {
+        return NextResponse.json({ 
+          error: 'No readable text found in the uploaded document. Please ensure your PDF or document contains selectable text and is not a scanned image.' 
+        }, { status: 400 });
+      }
+
       const prompt = `You are an expert interviewer and defense committee member. 
       Your persona is: ${persona}. You MUST strictly embody this persona in your tone and style.
       The candidate is applying for/defending: "${jobTitle}".
       Here is their background/context document:
       ---
-      ${parsedText.substring(0, 5000)}
+      ${parsedText.substring(0, 30000)}
       ---
       Your objective is to ask them a rigorous, highly relevant interview question based on their document.
       RULES:
