@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
-export const maxDuration = 60; // Increase Vercel timeout limit
 import pdfParse from 'pdf-parse';
+import prisma from '@/lib/prisma';
+
+export const maxDuration = 60; // Increase Vercel timeout limit
 
 // Initialize the Groq Client
-// Requires GROQ_API_KEY environment variable to be set
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(req: NextRequest) {
@@ -15,6 +16,8 @@ export async function POST(req: NextRequest) {
     if (action === 'start') {
       const jobTitle = formData.get('jobTitle') as string;
       const documentText = formData.get('documentText') as string;
+      const fileName = formData.get('fileName') as string || '';
+      const userId = formData.get('userId') as string || null;
       const file = formData.get('file') as File | null;
       const persona = formData.get('persona') as string || 'Standard Interviewer';
       
@@ -73,12 +76,36 @@ export async function POST(req: NextRequest) {
       let parsedData: any = {};
       try { parsedData = JSON.parse(responseText); } catch (e) { console.error("JSON parse error:", e); }
       const reply = parsedData.message || parsedData.reply || parsedData.question || parsedData.content || parsedData.response || "Could you tell me more about your background?";
-      return NextResponse.json({ reply, isComplete: !!parsedData.isComplete });
+
+      // Save Interview to SQL Database
+      let interviewId = '';
+      try {
+        const interview = await prisma.interview.create({
+          data: {
+            userId: userId || undefined,
+            jobTitle,
+            persona,
+            fileName: fileName || undefined,
+            documentText: parsedText.substring(0, 15000),
+            messages: {
+              create: [
+                { role: 'ai', content: reply }
+              ]
+            }
+          }
+        });
+        interviewId = interview.id;
+      } catch (dbErr) {
+        console.error("SQL Save Error (start):", dbErr);
+      }
+
+      return NextResponse.json({ reply, isComplete: !!parsedData.isComplete, interviewId });
     }
 
     if (action === 'chat') {
       const historyStr = formData.get('history') as string;
       const persona = formData.get('persona') as string || 'Standard Interviewer';
+      const interviewId = formData.get('interviewId') as string || '';
       const history = JSON.parse(historyStr);
       
       // Convert history to Groq format (role and content)
@@ -117,12 +144,39 @@ export async function POST(req: NextRequest) {
       let parsedData: any = {};
       try { parsedData = JSON.parse(responseText); } catch (e) { console.error("JSON parse error:", e); }
       const reply = parsedData.message || parsedData.reply || parsedData.question || parsedData.content || parsedData.response || "Please continue.";
-      return NextResponse.json({ reply, isComplete: !!parsedData.isComplete });
+
+      // Record latest turn to SQL Database
+      if (interviewId && history.length > 0) {
+        try {
+          const lastUserMsg = history[history.length - 1];
+          if (lastUserMsg && lastUserMsg.role === 'user') {
+            await prisma.message.create({
+              data: {
+                interviewId,
+                role: 'user',
+                content: lastUserMsg.content
+              }
+            });
+          }
+          await prisma.message.create({
+            data: {
+              interviewId,
+              role: 'ai',
+              content: reply
+            }
+          });
+        } catch (dbErr) {
+          console.error("SQL Save Error (chat):", dbErr);
+        }
+      }
+
+      return NextResponse.json({ reply, isComplete: !!parsedData.isComplete, interviewId });
     }
 
     if (action === 'evaluate') {
       const historyStr = formData.get('history') as string;
       const jobTitle = formData.get('jobTitle') as string;
+      const interviewId = formData.get('interviewId') as string || '';
       const history = JSON.parse(historyStr);
 
       const transcript = history.map((msg: any) => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n\n');
@@ -164,6 +218,35 @@ export async function POST(req: NextRequest) {
 
       const responseText = chatCompletion.choices[0]?.message?.content || '{}';
       const evaluation = JSON.parse(responseText);
+
+      // Save Evaluation to SQL Database
+      if (interviewId) {
+        try {
+          await prisma.evaluation.upsert({
+            where: { interviewId },
+            update: {
+              grade: evaluation.grade || 'B',
+              recommendation: evaluation.recommendation || '',
+              clarity: evaluation.metrics?.clarity || 0,
+              relevance: evaluation.metrics?.relevance || 0,
+              completeness: evaluation.metrics?.completeness || 0,
+              feedback: JSON.stringify(evaluation.feedback || [])
+            },
+            create: {
+              interviewId,
+              grade: evaluation.grade || 'B',
+              recommendation: evaluation.recommendation || '',
+              clarity: evaluation.metrics?.clarity || 0,
+              relevance: evaluation.metrics?.relevance || 0,
+              completeness: evaluation.metrics?.completeness || 0,
+              feedback: JSON.stringify(evaluation.feedback || [])
+            }
+          });
+        } catch (dbErr) {
+          console.error("SQL Save Error (evaluate):", dbErr);
+        }
+      }
+
       return NextResponse.json({ evaluation });
     }
 

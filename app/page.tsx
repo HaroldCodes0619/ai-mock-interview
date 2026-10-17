@@ -34,10 +34,10 @@ export default function MockInterviewApp() {
   // Auth State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  // Hardcoded Credentials
-  const APP_EMAIL = 'salvanaj75@gmail.com';
-  const APP_PASSWORD = 'Salvana';
+  const [userId, setUserId] = useState<string | null>(null);
+  const [interviewId, setInterviewId] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Setup State
   const [jobTitle, setJobTitle] = useState('');
@@ -148,13 +148,25 @@ export default function MockInterviewApp() {
     }
   }, [messages, view, currentInput]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.trim().toLowerCase() === APP_EMAIL && password === APP_PASSWORD) {
+    setAuthError(null);
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: authMode, email, password })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setAuthError(data.error || 'Authentication failed');
+        return;
+      }
+      setUserId(data.userId || null);
       setView('setup');
-    } else {
-      alert('Incorrect email or password');
-      setPassword('');
+    } catch (err: any) {
+      console.error("Auth error:", err);
+      setAuthError("Failed to connect to authentication service.");
     }
   };
 
@@ -181,11 +193,16 @@ export default function MockInterviewApp() {
       formData.append('persona', persona);
       formData.append('documentText', extractedText);
       formData.append('fileName', file.name);
+      if (userId) formData.append('userId', userId);
 
       const res = await fetch('/api/chat', { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || `API error: ${res.status}`);
+      }
+      
+      if (data.interviewId) {
+        setInterviewId(data.interviewId);
       }
       
       setMessages([{ role: 'ai', content: data.reply }]);
@@ -210,6 +227,7 @@ export default function MockInterviewApp() {
       formData.append('action', 'evaluate');
       formData.append('history', JSON.stringify(messages));
       formData.append('jobTitle', jobTitle);
+      if (interviewId) formData.append('interviewId', interviewId);
       try {
         const res = await fetch('/api/chat', { method: 'POST', body: formData });
         if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -244,6 +262,7 @@ export default function MockInterviewApp() {
     formData.append('action', 'chat');
     formData.append('history', JSON.stringify(newMessages));
     formData.append('persona', persona);
+    if (interviewId) formData.append('interviewId', interviewId);
 
     try {
       const res = await fetch('/api/chat', { method: 'POST', body: formData });
@@ -308,8 +327,20 @@ export default function MockInterviewApp() {
             <div className="flex justify-center mb-6">
               <img src="/logo_transparent.png" alt="AI Defense Coach Logo" className="w-32 h-32 object-contain drop-shadow-2xl" />
             </div>
-            <h1 className="text-3xl font-extrabold text-zinc-100 mb-2 tracking-tight">Access Required</h1>
-            <p className="text-zinc-400 mb-8">Please log in to access the AI Defense Coach.</p>
+            <h1 className="text-3xl font-extrabold text-zinc-100 mb-2 tracking-tight">
+              {authMode === 'login' ? 'Welcome Back' : 'Create Account'}
+            </h1>
+            <p className="text-zinc-400 mb-6">
+              {authMode === 'login' 
+                ? 'Sign in to access your interview sessions and records.' 
+                : 'Create an account to save your interview history and evaluations.'}
+            </p>
+
+            {authError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm font-medium">
+                {authError}
+              </div>
+            )}
             
             <form onSubmit={handleLogin} className="space-y-4">
               <input 
@@ -317,23 +348,47 @@ export default function MockInterviewApp() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email address..." 
-                className="w-full px-5 py-4 bg-zinc-950 rounded-xl border border-zinc-800 text-zinc-100 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all outline-none text-center tracking-widest"
+                className="w-full px-5 py-4 bg-zinc-950 rounded-xl border border-zinc-800 text-zinc-100 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all outline-none text-center"
               />
               <input 
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password..." 
-                className="w-full px-5 py-4 bg-zinc-950 rounded-xl border border-zinc-800 text-zinc-100 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all outline-none text-center tracking-widest"
+                className="w-full px-5 py-4 bg-zinc-950 rounded-xl border border-zinc-800 text-zinc-100 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all outline-none text-center"
               />
               <button 
                 type="submit"
                 disabled={!email || !password}
                 className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-emerald-500 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(16,185,129,0.2)]"
               >
-                Unlock Application
+                {authMode === 'login' ? 'Sign In' : 'Create Account'}
               </button>
             </form>
+
+            <div className="mt-6 text-sm text-zinc-400">
+              {authMode === 'login' ? (
+                <>
+                  Don't have an account?{' '}
+                  <button 
+                    onClick={() => { setAuthMode('register'); setAuthError(null); }}
+                    className="text-emerald-400 hover:text-emerald-300 font-semibold underline underline-offset-4"
+                  >
+                    Create one
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{' '}
+                  <button 
+                    onClick={() => { setAuthMode('login'); setAuthError(null); }}
+                    className="text-emerald-400 hover:text-emerald-300 font-semibold underline underline-offset-4"
+                  >
+                    Sign in
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </motion.div>
       )}
